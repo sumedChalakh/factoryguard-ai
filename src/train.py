@@ -35,23 +35,32 @@ print(f"X shape: {X.shape}, y shape: {y.shape}")
 print(f"Target distribution:\n{y.value_counts()}")
 
 # Step 2c: Train/test split + scaling
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+print("\nPerforming time-based train/test split (no leakage)...")
+# Sort by timestamp (critical)
+df_features = df_features.sort_values("timestamp")
 
-# Split data (80/20 split, random_state for reproducibility)
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
-)
+# 80% past → train, 20% future → test
+split_idx = int(len(df_features) * 0.8)
 
-print(f"\nTrain set: X_train={X_train.shape}, y_train={y_train.shape}")
+train_df = df_features.iloc[:split_idx]
+test_df = df_features.iloc[split_idx:]
+
+y_train = train_df["failure_24h"]
+y_test = test_df["failure_24h"]
+
+X_train = train_df.drop(columns=["failure_24h", "machine_id", "timestamp"])
+X_test = test_df.drop(columns=["failure_24h", "machine_id", "timestamp"])
+
+print(f"Train set: X_train={X_train.shape}, y_train={y_train.shape}")
 print(f"Test set: X_test={X_test.shape}, y_test={y_test.shape}")
 
-# Scale features (fit on train, apply to train+test)
+# Scale features (fit on train only)
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-print("Features scaled using StandardScaler")
+print("Features scaled using StandardScaler (train-fit only)")
 
 # Step 2d: Train Logistic Regression baseline
 from sklearn.linear_model import LogisticRegression
