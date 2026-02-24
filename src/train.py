@@ -3,7 +3,7 @@
 
 import pandas as pd
 from pathlib import Path
-from src.feature_engineering import create_features
+from feature_engineering import create_features
 
 # Define paths
 BASE_DIR = Path(__file__).resolve().parents[1]
