@@ -1,1 +1,55 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"predict_request": {
+		"type": "object",
+		"additionalProperties": false,
+		"required": ["temperature", "vibration", "pressure"],
+		"properties": {
+			"temperature": { "type": "number" },
+			"vibration": { "type": "number" },
+			"pressure": { "type": "number" }
+		}
+	},
+	"explain_request": {
+		"type": "object",
+		"additionalProperties": false,
+		"required": ["temperature", "vibration", "pressure"],
+		"properties": {
+			"temperature": { "type": "number" },
+			"vibration": { "type": "number" },
+			"pressure": { "type": "number" }
+		}
+	},
+	"predict_response": {
+		"type": "object",
+		"additionalProperties": false,
+		"required": ["failure_probability"],
+		"properties": {
+			"failure_probability": { "type": "number", "minimum": 0, "maximum": 1 }
+		}
+	},
+	"explain_response": {
+		"type": "object",
+		"additionalProperties": false,
+		"required": ["failure_probability", "base_value", "shap_values"],
+		"properties": {
+			"failure_probability": { "type": "number", "minimum": 0, "maximum": 1 },
+			"base_value": { "type": "number" },
+			"shap_values": {
+				"type": "object",
+				"minProperties": 1,
+				"additionalProperties": { "type": "number" }
+			}
+		}
+	},
+	"error_response": {
+		"type": "object",
+		"required": ["error"],
+		"properties": {
+			"error": { "type": "string" },
+			"message": { "type": "string" }
+		},
+		"additionalProperties": true
+	}
+}
 
