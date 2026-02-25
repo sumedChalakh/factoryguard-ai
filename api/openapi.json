@@ -1,0 +1,300 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "FactoryGuard AI API",
+    "description": "Equipment failure prediction and explanation API",
+    "version": "1.0.0",
+    "contact": {
+      "name": "FactoryGuard Team",
+      "url": "https://github.com/sumedChalakh/factoryguard-ai"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.factoryguard.com",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Simple health check returning OK status",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "ok"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Kubernetes Liveness Probe",
+        "description": "Check if process is alive (Kubernetes liveness)",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Process is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "alive"},
+                    "timestamp": {"type": "string", "format": "date-time"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Kubernetes Readiness Probe",
+        "description": "Check if process is ready to serve requests (Kubernetes readiness)",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Process is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "ready"},
+                    "model_version": {"type": "string", "example": "1.0.0"},
+                    "model_loaded_at": {"type": "string", "format": "date-time"},
+                    "timestamp": {"type": "string", "format": "date-time"}
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Process is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {"type": "string", "example": "not_ready"},
+                    "reason": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/predict": {
+      "post": {
+        "summary": "Predict Equipment Failure",
+        "description": "Get failure probability (0-1) for equipment",
+        "tags": ["Prediction"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["temperature", "vibration", "pressure"],
+                "properties": {
+                  "temperature": {
+                    "type": "number",
+                    "description": "Temperature in Celsius",
+                    "example": 60
+                  },
+                  "vibration": {
+                    "type": "number",
+                    "description": "Vibration amplitude",
+                    "example": 29
+                  },
+                  "pressure": {
+                    "type": "number",
+                    "description": "Pressure in PSI",
+                    "example": 102
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prediction successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "failure_probability": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "example": 0.95
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explain": {
+      "post": {
+        "summary": "Predict + Get SHAP Explanation",
+        "description": "Get failure probability with SHAP-based feature importance",
+        "tags": ["Prediction"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["temperature", "vibration", "pressure"],
+                "properties": {
+                  "temperature": {
+                    "type": "number",
+                    "description": "Temperature in Celsius",
+                    "example": 60
+                  },
+                  "vibration": {
+                    "type": "number",
+                    "description": "Vibration amplitude",
+                    "example": 29
+                  },
+                  "pressure": {
+                    "type": "number",
+                    "description": "Pressure in PSI",
+                    "example": 102
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prediction with explanation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "failure_probability": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "example": 0.95
+                    },
+                    "base_value": {
+                      "type": "number",
+                      "description": "SHAP base value (expected model output)",
+                      "example": 266.14
+                    },
+                    "shap_values": {
+                      "type": "object",
+                      "description": "Feature contributions (positive = increases failure risk)",
+                      "additionalProperties": {"type": "number"},
+                      "example": {
+                        "temperature": 0.12,
+                        "vibration": 0.33,
+                        "temperature_lag1": -0.05
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error type/category"
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable error message"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Health check endpoints"
+    },
+    {
+      "name": "Prediction",
+      "description": "Model prediction endpoints"
+    }
+  ]
+}
