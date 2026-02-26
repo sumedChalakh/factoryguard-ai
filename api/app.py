@@ -1,6 +1,6 @@
 import joblib
 import pandas as pd
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, g
 from pathlib import Path
 import sys
 import os
@@ -8,8 +8,14 @@ import json
 import logging
 from werkzeug.exceptions import HTTPException
 from jsonschema import Draft202012Validator
-from datetime import datetime
-from io import BytesIO
+from datetime import datetime, timezone
+from hmac import compare_digest
+from time import perf_counter
+from uuid import uuid4
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 # Load environment variables
 try:
@@ -43,6 +49,32 @@ app = Flask(__name__)
 DEBUG_MODE = os.getenv("FLASK_DEBUG", "0").lower() in {"1", "true", "yes"}
 app.config["PROPAGATE_EXCEPTIONS"] = DEBUG_MODE
 
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*")
+API_KEY_HEADER = os.getenv("API_KEY_HEADER", "X-API-Key")
+DEFAULT_RATE_LIMIT = os.getenv("DEFAULT_RATE_LIMIT", "120 per minute")
+PREDICT_RATE_LIMIT = os.getenv("PREDICT_RATE_LIMIT", "60 per minute")
+EXPLAIN_RATE_LIMIT = os.getenv("EXPLAIN_RATE_LIMIT", "30 per minute")
+RATE_LIMIT_STORAGE_URI = os.getenv("RATE_LIMIT_STORAGE_URI", "memory://")
+
+CORS(app, resources={r"/*": {"origins": ALLOWED_ORIGINS.split(",")}})
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[DEFAULT_RATE_LIMIT],
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+)
+
+REQUEST_COUNTER = Counter(
+    "factoryguard_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status_code"],
+)
+REQUEST_LATENCY = Histogram(
+    "factoryguard_request_latency_seconds",
+    "Request latency in seconds",
+    ["path"],
+)
+
 logger.info(f"Flask Debug Mode: {DEBUG_MODE}")
 logger.info(f"Environment: {os.getenv('FLASK_ENV', 'production')}")
 
@@ -55,7 +87,7 @@ SCHEMA_PATH = BASE_DIR / "api" / "schema.json"
 
 # Model version tracking
 MODEL_VERSION = "1.0.0"
-MODEL_LOADED_AT = datetime.utcnow().isoformat()
+MODEL_LOADED_AT = datetime.now(timezone.utc).isoformat()
 
 logger.info(f"Loading model from: {MODEL_PATH}")
 logger.info(f"Loading scaler from: {PREPROCESSOR_PATH}")
@@ -128,6 +160,54 @@ def preprocess_input(data: dict) -> pd.DataFrame:
 
     return X
 
+
+def _is_protected_path(path: str) -> bool:
+    return path in {"/predict", "/explain"}
+
+
+def _read_api_key_from_request() -> str:
+    header_key = request.headers.get(API_KEY_HEADER, "")
+    if header_key:
+        return header_key
+
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header.split(" ", 1)[1].strip()
+
+    return ""
+
+
+@app.before_request
+def before_request_hooks():
+    g.request_start = perf_counter()
+    g.request_id = request.headers.get("X-Request-Id", str(uuid4()))
+
+    expected_api_key = os.getenv("API_KEY", "").strip()
+    if expected_api_key and _is_protected_path(request.path):
+        provided_key = _read_api_key_from_request()
+        if not provided_key or not compare_digest(provided_key, expected_api_key):
+            return jsonify({
+                "error": "Unauthorized",
+                "message": "Missing or invalid API key"
+            }), 401
+
+
+@app.after_request
+def after_request_hooks(response):
+    elapsed = perf_counter() - getattr(g, "request_start", perf_counter())
+    REQUEST_LATENCY.labels(path=request.path).observe(elapsed)
+    REQUEST_COUNTER.labels(
+        method=request.method,
+        path=request.path,
+        status_code=str(response.status_code),
+    ).inc()
+
+    response.headers["X-Request-Id"] = getattr(g, "request_id", "unknown")
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
 # ------------------------------------------------------------------
 # Health & Readiness Checks (Kubernetes compatible)
 # ------------------------------------------------------------------
@@ -141,7 +221,7 @@ def liveness_probe():
     """Kubernetes liveness probe - is process alive?"""
     return jsonify({
         "status": "alive",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }), 200
 
 
@@ -149,22 +229,13 @@ def liveness_probe():
 def readiness_probe():
     """Kubernetes readiness probe - can process serve requests?"""
     try:
-        # Quick sanity check: can we use the model?
-        test_input = pd.DataFrame({
-            "temperature": [20.0],
-            "vibration": [1.0],
-            "pressure": [101.0],
-            "machine_id": [0],
-            "timestamp": [pd.Timestamp.now()],
-            "failure_24h": [0]
-        })
         _ = model.predict_proba([[0] * len(scaler.feature_names_in_)])
         
         return jsonify({
             "status": "ready",
             "model_version": MODEL_VERSION,
             "model_loaded_at": MODEL_LOADED_AT,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }), 200
     except Exception as e:
         logger.error(f"Readiness check failed: {str(e)}")
@@ -194,6 +265,11 @@ def swagger_ui():
         return f.read(), 200, {"Content-Type": "text/html"}
 
 
+@app.route("/metrics", methods=["GET"])
+def metrics():
+    return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
+
+
 @app.errorhandler(HTTPException)
 def handle_http_exception(error):
     logger.warning(f"HTTP Exception: {error.name} | {error.description}")
@@ -217,6 +293,7 @@ def handle_unexpected_exception(error):
 # PREDICT ONLY
 # ------------------------------------------------------------------
 @app.route("/predict", methods=["POST"])
+@limiter.limit(PREDICT_RATE_LIMIT)
 def predict():
     data = request.get_json(silent=True)
     if not data:
@@ -248,6 +325,7 @@ def predict():
 # PREDICT + SHAP EXPLANATION
 # ------------------------------------------------------------------
 @app.route("/explain", methods=["POST"])
+@limiter.limit(EXPLAIN_RATE_LIMIT)
 def explain():
     data = request.get_json(silent=True)
     if not data:

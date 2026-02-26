@@ -61,3 +61,41 @@ def test_predict_wrong_type_returns_400():
     assert response.status_code == 400
     body = response.get_json()
     assert body["error"] == "Invalid request payload"
+
+
+def test_liveness_and_readiness_endpoints():
+    client = app.test_client()
+
+    live = client.get("/health/live")
+    assert live.status_code == 200
+    assert live.get_json()["status"] == "alive"
+
+    ready = client.get("/health/ready")
+    assert ready.status_code in (200, 503)
+
+
+def test_docs_and_metrics_endpoints():
+    client = app.test_client()
+
+    docs = client.get("/docs")
+    assert docs.status_code == 200
+    assert "text/html" in docs.content_type
+
+    openapi = client.get("/openapi.json")
+    assert openapi.status_code == 200
+    assert "openapi" in openapi.get_json()
+
+    metrics = client.get("/metrics")
+    assert metrics.status_code == 200
+    assert "factoryguard_requests_total" in metrics.get_data(as_text=True)
+
+
+def test_predict_requires_api_key_when_configured(monkeypatch):
+    monkeypatch.setenv("API_KEY", "topsecret")
+    client = app.test_client()
+
+    unauthorized = client.post("/predict", json=_valid_payload())
+    assert unauthorized.status_code == 401
+
+    authorized = client.post("/predict", json=_valid_payload(), headers={"X-API-Key": "topsecret"})
+    assert authorized.status_code == 200
