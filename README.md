@@ -1,90 +1,115 @@
 # FactoryGuard AI
 
-A production-grade machine learning API for **predictive equipment failure detection** using SHAP-explainable logistic regression and XGBoost models.
+FactoryGuard AI is a production-ready ML API for predictive equipment failure detection using sensor data.
 
-**Status:** 58% → 85%+ Production Ready | CI/CD Enabled | Fully Tested
+Status: Internship deployment ready (project scope complete) | CI/CD enabled | tests passing.
 
----
+## Overview
 
-## 🎯 Overview
+The API predicts failure probability using input sensors:
+- `temperature`
+- `vibration`
+- `pressure`
 
-FactoryGuard AI predicts industrial equipment failures 24 hours in advance using real-time sensor data (temperature, vibration, pressure). Each prediction includes **SHAP explanations** to understand which sensors contributed to the failure risk.
+It also supports SHAP-based explanation output for model interpretability.
 
-**Key Features:**
-- ✅ REST API with strict JSON schema validation
-- ✅ SHAP-based explainable AI (per-instance feature importance)
-- ✅ Automated test suite (9 pytest tests, 100% passing)
-- ✅ GitHub Actions CI/CD (Python 3.10, 3.12)
-- ✅ Production-safe error handling (JSON responses, no HTML tracebacks)
-- ✅ Docker support for containerized deployment
-- ✅ Time-based train/test split (no data leakage)
+## Implemented Features
 
----
+- REST API with request/response JSON schema validation
+- Prediction endpoint: `/predict`
+- Explanation endpoint: `/explain`
+- Health endpoints: `/`, `/health/live`, `/health/ready`
+- Metrics endpoint: `/metrics` (Prometheus format)
+- OpenAPI spec and docs: `/openapi.json`, `/docs`, `/swagger`
+- API key protection for inference endpoints
+- CORS via environment configuration
+- Configurable rate limiting
+- Structured logging + request ID headers
+- CI pipeline on GitHub Actions (Python 3.10 and 3.12)
+- Automated pytest suite (9 tests)
 
-## 📋 Requirements
+## Quick Start
 
-- **Python:** 3.10+ 
-- **OS:** Linux, macOS, Windows (with conda/venv)
-- **RAM:** 4GB minimum (for model & SHAP computation)
+### 1) Clone
 
----
-
-## 🚀 Quick Start
-
-### 1. Clone the Repository
 ```bash
 git clone https://github.com/sumedChalakh/factoryguard-ai.git
 cd factoryguard-ai
 ```
 
-### 2. Create Virtual Environment
+### 2) Create environment
+
 ```bash
-# Using conda (recommended)
+# conda
 conda create -n factoryguard python=3.12
 conda activate factoryguard
 
-# OR using venv
+# OR venv
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Windows
+venv\Scripts\activate
 ```
 
-### 3. Install Dependencies
+### 3) Install dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Run Tests
+### 4) Configure environment
+
+```bash
+copy .env.example .env
+```
+
+### 5) Run tests
+
 ```bash
 pytest test_api.py -v
 ```
 
-### 5. Start the API Server
+### 6) Start API
+
 ```bash
 python -m api.app
 ```
 
-API will be available at: **http://localhost:5000**
+Base URL: `http://localhost:5000`
 
----
+## Security Configuration
 
-## 📡 API Reference
+Set these values in `.env` for secured inference:
 
-### Health Check
-```http
-GET /
+```bash
+API_KEY=change-me
+API_KEY_HEADER=X-API-Key
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+DEFAULT_RATE_LIMIT=120 per minute
+PREDICT_RATE_LIMIT=60 per minute
+EXPLAIN_RATE_LIMIT=30 per minute
+RATE_LIMIT_STORAGE_URI=memory://
 ```
-**Response (200 OK):**
+
+Notes:
+- If `API_KEY` is set, `/predict` and `/explain` require it.
+- For multi-instance production, use Redis for `RATE_LIMIT_STORAGE_URI`.
+
+## API Summary
+
+### GET `/`
+Basic health check.
+
+### GET `/health/live`
+Liveness probe.
+
+### GET `/health/ready`
+Readiness probe (returns model readiness).
+
+### POST `/predict`
+Returns failure probability.
+
+Request body:
 ```json
-{
-  "status": "ok"
-}
-```
-
-### Predict Failure Probability
-```http
-POST /predict
-Content-Type: application/json
-
 {
   "temperature": 60,
   "vibration": 29,
@@ -92,225 +117,73 @@ Content-Type: application/json
 }
 ```
 
-**Response (200 OK):**
-```json
-{
-  "failure_probability": 0.95
-}
-```
+### POST `/explain`
+Returns failure probability + SHAP contribution map.
 
-**Error Response (400 Bad Request):**
-```json
-{
-  "error": "Invalid request payload",
-  "message": "temperature is a required property"
-}
-```
+### GET `/metrics`
+Prometheus metrics.
 
-### Predict + Get SHAP Explanation
-```http
-POST /explain
-Content-Type: application/json
+### Docs
+- `/docs`
+- `/swagger`
+- `/openapi.json`
 
-{
-  "temperature": 60,
-  "vibration": 29,
-  "pressure": 102
-}
-```
+## Testing
 
-**Response (200 OK):**
-```json
-{
-  "failure_probability": 0.95,
-  "base_value": 266.14,
-  "shap_values": {
-    "temperature": 0.12,
-    "temperature_lag1": -0.05,
-    "vibration": 0.33,
-    "vibration_mean_6h": 0.18
-  }
-}
-```
+Run:
 
----
-
-## 🏗️ Architecture
-
-### Data Flow
-```
-Raw Sensor Input
-    ↓
-Feature Engineering (lags + rolling stats)
-    ↓
-StandardScaler (fit on train only)
-    ↓
-LogisticRegression / XGBoost Model
-    ↓
-Prediction + SHAP Explanation
-    ↓
-JSON Response
-```
-
-### Directory Structure
-```
-.
-├── api/
-│   ├── app.py              # Flask application & endpoints
-│   ├── schema.json         # JSON schema validation
-│   └── __init__.py
-├── src/
-│   ├── train.py            # Training pipeline
-│   ├── evaluate.py         # Model evaluation
-│   ├── feature_engineering.py
-│   ├── utils.py            # SHAP explainer
-│   └── __init__.py
-├── models/                 # Trained models (joblib)
-├── data/
-│   ├── raw/                # Raw sensor data
-│   └── processed/          # Feature engineered data
-├── docker/                 # Docker configuration
-├── docs/                   # Documentation
-├── .github/
-│   └── workflows/
-│       └── test.yml        # GitHub Actions CI
-├── requirements.txt
-├── test_api.py            # Pytest tests
-└── README.md
-```
-
----
-
-## 🧪 Testing
-
-### Run All Tests
 ```bash
 pytest test_api.py -v
 ```
 
-### With Coverage
-```bash
-pytest test_api.py --cov=api --cov-report=html
-```
+Current test scope includes:
+- health/liveness/readiness
+- predict/explain happy paths
+- schema validation failures
+- API key enforcement behavior
+- docs and metrics endpoint checks
 
-**Coverage:**
-- ✅ Health endpoint
-- ✅ Valid predictions & SHAP explanations
-- ✅ Schema validation (missing fields, wrong types)
-- ✅ Error responses (400, 500)
+## CI/CD
 
----
+GitHub Actions workflow (`.github/workflows/test.yml`) runs on push/PR for `main` and `develop`.
 
-## 🐳 Docker Deployment
+Pipeline checks:
+- dependency installation
+- pytest execution
+- schema JSON validation
 
-### Build & Run
+## Deployment
+
+### Docker
+
 ```bash
 docker build -f docker/Dockerfile -t factoryguard:latest .
-docker run -p 5000:5000 \
-  -e FLASK_ENV=production \
-  factoryguard:latest
+docker run -p 5000:5000 --env-file .env factoryguard:latest
 ```
 
----
+### Kubernetes probes
 
-## 🚢 Kubernetes
+Use:
+- liveness: `/health/live`
+- readiness: `/health/ready`
 
-Use standard health probes:
-```yaml
-livenessProbe:
-  httpGet:
-    path: /health/live
-    port: 5000
+## Project Structure
 
-readinessProbe:
-  httpGet:
-    path: /health/ready
-    port: 5000
+```text
+api/                 Flask app, schema, OpenAPI, docs page
+src/                 Training, evaluation, feature engineering, utils
+docker/              Docker assets
+docs/                Additional docs
+.github/workflows/   CI pipeline
+test_api.py          API tests
+requirements.txt     Dependencies
 ```
 
----
+## Notes for Internship Review
 
-## 🔐 Security & Best Practices
+- The project is deployment-ready for internship/demo scope.
+- Inference endpoints are protected and observable.
+- CI is configured and validates every push.
+- Previous failed workflow runs remain visible in GitHub history; check the latest run status for current state.
 
-### Implemented
-- ✅ JSON schema validation
-- ✅ Safe error handling (no tracebacks)
-- ✅ Model versioning ready
-
-### Recommended for Production
-- 🔒 API key authentication
-- 🔒 HTTPS/TLS
-- 🔒 CORS configuration
-- 🔒 Rate limiting
-- 🔒 Centralized logging (ELK, CloudWatch)
-- 🔒 Monitoring (Prometheus, DataDog)
-
----
-
-## 📊 Model Performance
-
-**Primary Metric:** PR-AUC
-
-```bash
-cat reports/evaluation_results.csv
-```
-
----
-
-## 🔄 CI/CD Pipeline
-
-GitHub Actions runs on every push:
-- ✅ Pytest on Python 3.10 & 3.12
-- ✅ Schema validation
-- ✅ Coverage reporting
-
-View at: https://github.com/sumedChalakh/factoryguard-ai/actions
-
----
-
-## 🛠️ Development
-
-### Start with Debug Mode
-```bash
-FLASK_DEBUG=1 python -m api.app
-```
-
-### Train New Model
-```bash
-python src/train.py
-```
-
-### Evaluate Performance
-```bash
-python src/evaluate.py
-```
-
----
-
-## 🐛 Troubleshooting
-
-- **"Input X contains NaN"** → Ensure all sensors are provided
-- **"schema.json not found"** → Run from project root
-- **Port 5000 in use** → Change port or kill process
-
----
-
-## 📚 More Info
-
-- [API Errors & Examples](docs/api_errors.md)
-- [Architecture Notes](docs/design_notes.md)
-
----
-
-## 🤝 Contributing
-
-1. Fork repo
-2. Feature branch: `git checkout -b feature/my-feature`
-3. Test: `pytest test_api.py -v`
-4. Commit & push
-5. Open PR
-
----
-
-**Built with ❤️ by FactoryGuard Team**  
-Last Updated: February 26, 2026
+Last updated: February 27, 2026
