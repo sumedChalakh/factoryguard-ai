@@ -92,10 +92,17 @@ MODEL_LOADED_AT = datetime.now(timezone.utc).isoformat()
 logger.info(f"Loading model from: {MODEL_PATH}")
 logger.info(f"Loading scaler from: {PREPROCESSOR_PATH}")
 
-model = joblib.load(MODEL_PATH)
-scaler = joblib.load(PREPROCESSOR_PATH)
+model = None
+scaler = None
+MODEL_LOAD_ERROR = None
 
-logger.info(f"Model loaded successfully | Version: {MODEL_VERSION}")
+try:
+    model = joblib.load(MODEL_PATH)
+    scaler = joblib.load(PREPROCESSOR_PATH)
+    logger.info(f"Model loaded successfully | Version: {MODEL_VERSION}")
+except Exception as model_load_exception:
+    MODEL_LOAD_ERROR = str(model_load_exception)
+    logger.warning(f"Model artifacts not available at startup: {MODEL_LOAD_ERROR}")
 
 with open(SCHEMA_PATH, "r", encoding="utf-8") as schema_file:
     API_SCHEMAS = json.load(schema_file)
@@ -128,6 +135,17 @@ def validate_response_payload(payload: dict, schema_name: str):
     if errors:
         first_error = errors[0]
         raise RuntimeError(f"Response schema validation failed: {first_error.message}")
+
+
+def is_model_ready() -> bool:
+    return model is not None and scaler is not None
+
+
+def model_unavailable_response():
+    return jsonify({
+        "error": "Service Unavailable",
+        "message": "Model artifacts are not loaded"
+    }), 503
 
 # ------------------------------------------------------------------
 # Shared preprocessing (CRITICAL)
@@ -229,6 +247,9 @@ def liveness_probe():
 def readiness_probe():
     """Kubernetes readiness probe - can process serve requests?"""
     try:
+        if not is_model_ready():
+            raise RuntimeError(MODEL_LOAD_ERROR or "Model/scaler not loaded")
+
         _ = model.predict_proba([[0] * len(scaler.feature_names_in_)])
         
         return jsonify({
@@ -295,6 +316,10 @@ def handle_unexpected_exception(error):
 @app.route("/predict", methods=["POST"])
 @limiter.limit(PREDICT_RATE_LIMIT)
 def predict():
+    if not is_model_ready():
+        logger.error("Predict requested but model is unavailable")
+        return model_unavailable_response()
+
     data = request.get_json(silent=True)
     if not data:
         logger.warning("Predict called with empty payload")
@@ -327,6 +352,10 @@ def predict():
 @app.route("/explain", methods=["POST"])
 @limiter.limit(EXPLAIN_RATE_LIMIT)
 def explain():
+    if not is_model_ready():
+        logger.error("Explain requested but model is unavailable")
+        return model_unavailable_response()
+
     data = request.get_json(silent=True)
     if not data:
         logger.warning("Explain called with empty payload")

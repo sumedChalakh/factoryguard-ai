@@ -1,4 +1,53 @@
-from api.app import app
+import pandas as pd
+import pytest
+import api.app as app_module
+
+
+app = app_module.app
+
+
+class DummyScaler:
+    feature_names_in_ = ["temperature", "vibration", "pressure"]
+
+    def transform(self, X):
+        return X[self.feature_names_in_].to_numpy(dtype=float)
+
+
+class DummyModel:
+    def predict_proba(self, X):
+        result = []
+        for row in X:
+            mean_value = float(sum(row) / len(row)) if len(row) else 0.0
+            score = max(0.0, min(1.0, mean_value / 200.0))
+            result.append([1.0 - score, score])
+        return result
+
+
+@pytest.fixture(autouse=True)
+def patch_model_and_pipeline(monkeypatch):
+    monkeypatch.setattr(app_module, "model", DummyModel(), raising=False)
+    monkeypatch.setattr(app_module, "scaler", DummyScaler(), raising=False)
+    monkeypatch.setattr(
+        app_module,
+        "preprocess_input",
+        lambda data: pd.DataFrame([
+            {
+                "temperature": float(data["temperature"]),
+                "vibration": float(data["vibration"]),
+                "pressure": float(data["pressure"]),
+            }
+        ]),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        app_module,
+        "explain_with_shap",
+        lambda model, X_row: {
+            "base_value": 0.5,
+            "shap_values": {col: 0.0 for col in X_row.columns},
+        },
+        raising=False,
+    )
 
 
 def _valid_payload():
