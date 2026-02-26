@@ -28,7 +28,6 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-from src.feature_engineering import create_features
 from src.utils import explain_with_shap
 
 # ------------------------------------------------------------------
@@ -152,31 +151,17 @@ def model_unavailable_response():
 # ------------------------------------------------------------------
 def preprocess_input(data: dict) -> pd.DataFrame:
     """
-    Convert raw JSON input into model-ready feature vector.
-    Matches training pipeline EXACTLY.
+    Convert raw JSON input into model-ready feature vector for real-time inference.
+    Uses current sensor readings and fills historical/rolling features with 0.
+    This avoids expensive rolling/groupby operations during online prediction.
     """
+    feature_row = {feature_name: 0.0 for feature_name in scaler.feature_names_in_}
 
-    # JSON → DataFrame
-    df = pd.DataFrame([data])
+    for sensor_name in ("temperature", "vibration", "pressure"):
+        if sensor_name in feature_row:
+            feature_row[sensor_name] = float(data[sensor_name])
 
-    # Required columns for feature engineering
-    df["machine_id"] = 0
-    df["timestamp"] = pd.Timestamp.now()
-    df["failure_24h"] = 0
-
-    # Feature engineering (same as training)
-    df_fe = create_features(df)
-
-    # Drop training-only columns
-    X = df_fe.drop(columns=["failure_24h", "machine_id", "timestamp"])
-
-    # 🔥 FIX: handle NaNs from lag/rolling windows
-    X = X.ffill().fillna(0)
-
-    # Force exact feature order
-    X = X[scaler.feature_names_in_]
-
-    return X
+    return pd.DataFrame([feature_row], columns=scaler.feature_names_in_)
 
 
 def _is_protected_path(path: str) -> bool:
