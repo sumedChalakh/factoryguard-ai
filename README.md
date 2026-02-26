@@ -1,114 +1,139 @@
 # FactoryGuard AI
 
-FactoryGuard AI is a production-ready ML API for predictive equipment failure detection using sensor data.
+FactoryGuard AI is an ML-powered predictive maintenance API for equipment failure risk scoring and feature-level explainability.
 
-Status: Internship deployment ready (project scope complete) | CI/CD enabled | tests passing.
+**Final Project Status:** Internship handoff ready, deployment ready for project scope, CI validated.
 
-## Overview
+## 1) What This Project Does
 
-The API predicts failure probability using input sensors:
+FactoryGuard AI accepts three sensor inputs:
 - `temperature`
 - `vibration`
 - `pressure`
 
-It also supports SHAP-based explanation output for model interpretability.
+It returns:
+- a failure probability (`/predict`)
+- optional SHAP explanation (`/explain`)
 
-## Implemented Features
+This repository includes:
+- model-serving API
+- schema validation
+- security controls (API key, CORS, rate limiting)
+- observability (health/readiness/metrics)
+- tests + CI pipeline
 
-- REST API with request/response JSON schema validation
-- Prediction endpoint: `/predict`
-- Explanation endpoint: `/explain`
-- Health endpoints: `/`, `/health/live`, `/health/ready`
-- Metrics endpoint: `/metrics` (Prometheus format)
-- OpenAPI spec and docs: `/openapi.json`, `/docs`, `/swagger`
-- API key protection for inference endpoints
-- CORS via environment configuration
-- Configurable rate limiting
-- Structured logging + request ID headers
-- CI pipeline on GitHub Actions (Python 3.10 and 3.12)
-- Automated pytest suite (9 tests)
+## 2) Production Features Implemented
 
-## Quick Start
+- Flask API with strict JSON schema validation
+- Model-serving endpoints (`/predict`, `/explain`)
+- Health and readiness probes (`/`, `/health/live`, `/health/ready`)
+- Prometheus-compatible metrics endpoint (`/metrics`)
+- OpenAPI + docs endpoints (`/openapi.json`, `/docs`, `/swagger`)
+- API key protection for inference routes
+- Configurable CORS allowlist
+- Configurable rate limiting per endpoint
+- Structured logging and request IDs
+- Automated tests (9 pytest tests)
+- GitHub Actions CI for Python 3.10 and 3.12
 
-### 1) Clone
+## 3) Quick Start
+
+### 3.1 Clone Repository
 
 ```bash
 git clone https://github.com/sumedChalakh/factoryguard-ai.git
 cd factoryguard-ai
 ```
 
-### 2) Create environment
+### 3.2 Create Virtual Environment
 
 ```bash
-# conda
+# Option A: Conda
 conda create -n factoryguard python=3.12
 conda activate factoryguard
 
-# OR venv
+# Option B: venv
 python -m venv venv
 # Windows
 venv\Scripts\activate
 ```
 
-### 3) Install dependencies
+### 3.3 Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4) Configure environment
+### 3.4 Configure Environment
 
 ```bash
 copy .env.example .env
 ```
 
-### 5) Run tests
+Update `.env` values for your machine/security.
+
+### 3.5 Run Tests
 
 ```bash
 pytest test_api.py -v
 ```
 
-### 6) Start API
+### 3.6 Run API
 
 ```bash
 python -m api.app
 ```
 
-Base URL: `http://localhost:5000`
+Default base URL: `http://localhost:5000`
 
-## Security Configuration
+## 4) Environment Configuration
 
-Set these values in `.env` for secured inference:
+Key environment variables (see `.env.example`):
 
 ```bash
+FLASK_ENV=production
+FLASK_DEBUG=0
+LOG_LEVEL=INFO
+
 API_KEY=change-me
 API_KEY_HEADER=X-API-Key
+
 ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+
 DEFAULT_RATE_LIMIT=120 per minute
 PREDICT_RATE_LIMIT=60 per minute
 EXPLAIN_RATE_LIMIT=30 per minute
 RATE_LIMIT_STORAGE_URI=memory://
+
+MODEL_PATH=models/model.joblib
+SCALER_PATH=models/preprocessor.joblib
+
+HOST=0.0.0.0
+PORT=5000
 ```
 
-Notes:
+### Notes
 - If `API_KEY` is set, `/predict` and `/explain` require it.
-- For multi-instance production, use Redis for `RATE_LIMIT_STORAGE_URI`.
+- For distributed/real production, set `RATE_LIMIT_STORAGE_URI` to Redis.
 
-## API Summary
+## 5) API Contract
 
-### GET `/`
-Basic health check.
+### 5.1 Health
 
-### GET `/health/live`
+#### `GET /`
+Basic service status.
+
+#### `GET /health/live`
 Liveness probe.
 
-### GET `/health/ready`
-Readiness probe (returns model readiness).
+#### `GET /health/ready`
+Readiness probe (model/scaler readiness).
 
-### POST `/predict`
-Returns failure probability.
+### 5.2 Prediction
 
-Request body:
+#### `POST /predict`
+
+Request:
 ```json
 {
   "temperature": 60,
@@ -117,73 +142,117 @@ Request body:
 }
 ```
 
-### POST `/explain`
-Returns failure probability + SHAP contribution map.
+Response:
+```json
+{
+  "failure_probability": 0.95
+}
+```
 
-### GET `/metrics`
-Prometheus metrics.
+#### `POST /explain`
 
-### Docs
-- `/docs`
-- `/swagger`
-- `/openapi.json`
+Request:
+```json
+{
+  "temperature": 60,
+  "vibration": 29,
+  "pressure": 102
+}
+```
 
-## Testing
+Response shape:
+```json
+{
+  "failure_probability": 0.95,
+  "base_value": 0.5,
+  "shap_values": {
+    "temperature": 0.0,
+    "vibration": 0.0,
+    "pressure": 0.0
+  }
+}
+```
 
-Run:
+### 5.3 Docs & Metrics
+
+- `GET /openapi.json`
+- `GET /docs`
+- `GET /swagger`
+- `GET /metrics`
+
+## 6) Authentication
+
+When `API_KEY` is configured, pass it as either:
+- header: `X-API-Key: <your-key>`
+- or bearer token: `Authorization: Bearer <your-key>`
+
+Protected routes:
+- `/predict`
+- `/explain`
+
+## 7) Testing
+
+Run all tests:
 
 ```bash
 pytest test_api.py -v
 ```
 
-Current test scope includes:
-- health/liveness/readiness
-- predict/explain happy paths
-- schema validation failures
+Current suite: **9 tests**, covering:
+- health/live/ready endpoints
+- prediction and explanation success paths
+- schema validation errors
 - API key enforcement behavior
-- docs and metrics endpoint checks
+- docs + metrics endpoints
 
-## CI/CD
+## 8) CI/CD
 
-GitHub Actions workflow (`.github/workflows/test.yml`) runs on push/PR for `main` and `develop`.
+Workflow: `.github/workflows/test.yml`
 
-Pipeline checks:
+Runs on push/PR (`main`, `develop`) and validates:
 - dependency installation
 - pytest execution
-- schema JSON validation
+- schema JSON loading
 
-## Deployment
+Historical failed runs may still appear in Actions history; latest run status is the source of truth.
 
-### Docker
+## 9) Deployment
+
+### 9.1 Docker
 
 ```bash
 docker build -f docker/Dockerfile -t factoryguard:latest .
 docker run -p 5000:5000 --env-file .env factoryguard:latest
 ```
 
-### Kubernetes probes
+### 9.2 Kubernetes Probes
 
-Use:
-- liveness: `/health/live`
-- readiness: `/health/ready`
+- Liveness path: `/health/live`
+- Readiness path: `/health/ready`
 
-## Project Structure
+### 9.3 Recommended Infra Controls
+
+- TLS termination at ingress/reverse proxy
+- Redis-backed limiter storage
+- centralized logging (ELK/CloudWatch)
+- metrics scraping + alerting (Prometheus/Grafana)
+
+## 10) Project Structure
 
 ```text
-api/                 Flask app, schema, OpenAPI, docs page
-src/                 Training, evaluation, feature engineering, utils
-docker/              Docker assets
-docs/                Additional docs
+api/                 Flask app, schemas, OpenAPI, docs UI
+src/                 Training, evaluation, feature engineering, utilities
+docker/              Docker files
+docs/                Design and API notes
 .github/workflows/   CI pipeline
-test_api.py          API tests
+test_api.py          API test suite
 requirements.txt     Dependencies
 ```
 
-## Notes for Internship Review
+## 11) Internship Handoff Notes
 
-- The project is deployment-ready for internship/demo scope.
-- Inference endpoints are protected and observable.
-- CI is configured and validates every push.
-- Previous failed workflow runs remain visible in GitHub history; check the latest run status for current state.
+- Project is complete for internship demonstration/deployment scope.
+- API is secured, observable, and CI-validated.
+- Documentation is finalized in this README and OpenAPI docs.
 
 Last updated: February 27, 2026
