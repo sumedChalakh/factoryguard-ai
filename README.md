@@ -216,7 +216,45 @@ Runs on push/PR (`main`, `develop`) and validates:
 
 Historical failed runs may still appear in Actions history; latest run status is the source of truth.
 
-## 9) Deployment
+## 9) Performance Evidence (Latency)
+
+The internship review requires a real-time API returning failure probability in under 50ms.
+
+### 9.1 Benchmark Method
+
+Benchmark script: `src/latency_benchmark.py`
+
+Command used for real-time `/predict` validation:
+
+```bash
+python src/latency_benchmark.py --url http://127.0.0.1:5000/predict --requests 50 --concurrency 1 --warmup 5
+```
+
+### 9.2 Measured Results (`/predict`)
+
+- Success rate: 50/50 (0% error)
+- Average latency: 18.88 ms
+- p50 latency: 16.74 ms
+- p95 latency: 32.27 ms
+- p99 latency: 32.97 ms
+- Max latency: 33.25 ms
+
+✅ Requirement met: failure probability endpoint is under 50ms in real-time single-user conditions.
+
+### 9.3 Supporting Results (`/explain`)
+
+Command:
+
+```bash
+python src/latency_benchmark.py --url http://127.0.0.1:5000/explain --requests 20 --concurrency 1 --warmup 3
+```
+
+Observed:
+- Average latency: 20.25 ms
+- p95 latency: 34.32 ms
+- Error rate: 0%
+
+## 10) Deployment
 
 ### 9.1 Docker
 
@@ -237,7 +275,7 @@ docker run -p 5000:5000 --env-file .env factoryguard:latest
 - centralized logging (ELK/CloudWatch)
 - metrics scraping + alerting (Prometheus/Grafana)
 
-## 10) Project Structure
+## 11) Project Structure
 
 ```text
 api/                 Flask app, schemas, OpenAPI, docs UI
@@ -249,7 +287,7 @@ test_api.py          API test suite
 requirements.txt     Dependencies
 ```
 
-## 11) Internship Handoff Notes
+## 12) Internship Handoff Notes
 
 - Project is complete for internship demonstration/deployment scope.
 - API is secured, observable, and CI-validated.
