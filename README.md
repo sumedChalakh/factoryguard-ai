@@ -13,7 +13,7 @@ FactoryGuard AI predicts industrial equipment failures 24 hours in advance using
 **Key Features:**
 - ✅ REST API with strict JSON schema validation
 - ✅ SHAP-based explainable AI (per-instance feature importance)
-- ✅ Automated test suite (6 pytest tests, 100% passing)
+- ✅ Automated test suite (9 pytest tests, 100% passing)
 - ✅ GitHub Actions CI/CD (Python 3.10, 3.12)
 - ✅ Production-safe error handling (JSON responses, no HTML tracebacks)
 - ✅ Docker support for containerized deployment
