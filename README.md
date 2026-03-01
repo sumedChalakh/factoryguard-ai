@@ -1,51 +1,108 @@
-# FactoryGuard AI
+# FactoryGuard AI 🏭⚡
 
-FactoryGuard AI is an ML-powered predictive maintenance API for equipment failure risk scoring and feature-level explainability.
+> **Unplanned factory equipment failures cost manufacturers billions annually.**
+> FactoryGuard AI is a production-ready, ML-powered predictive maintenance API that scores equipment failure risk in real-time from sensor data — with built-in explainability so engineers know *why* a machine is flagged, not just *that* it is.
 
-**Final Project Status:** Internship handoff ready, deployment ready for project scope, CI validated.
+[![CI](https://github.com/sumedChalakh/factoryguard-ai/actions/workflows/test.yml/badge.svg)](https://github.com/sumedChalakh/factoryguard-ai/actions)
+![Python](https://img.shields.io/badge/python-3.10%20|%203.12-blue)
+![Flask](https://img.shields.io/badge/framework-Flask-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-## 1) What This Project Does
+---
 
-FactoryGuard AI accepts three sensor inputs:
-- `temperature`
-- `vibration`
-- `pressure`
+## 📌 What This Project Does
 
-It returns:
-- a failure probability (`/predict`)
-- optional SHAP explanation (`/explain`)
+FactoryGuard AI accepts three real-time sensor readings from industrial equipment:
 
-This repository includes:
-- model-serving API
-- schema validation
-- security controls (API key, CORS, rate limiting)
-- observability (health/readiness/metrics)
-- tests + CI pipeline
+| Input | Description |
+|---|---|
+| `temperature` | Equipment operating temperature (°C) |
+| `vibration` | Vibration intensity (mm/s) |
+| `pressure` | Operating pressure (bar) |
 
-## 2) Production Features Implemented
+And returns:
 
-- Flask API with strict JSON schema validation
-- Model-serving endpoints (`/predict`, `/explain`)
-- Health and readiness probes (`/`, `/health/live`, `/health/ready`)
-- Prometheus-compatible metrics endpoint (`/metrics`)
-- OpenAPI + docs endpoints (`/openapi.json`, `/docs`, `/swagger`)
-- API key protection for inference routes
-- Configurable CORS allowlist
-- Configurable rate limiting per endpoint
-- Structured logging and request IDs
-- Automated tests (9 pytest tests)
-- GitHub Actions CI for Python 3.10 and 3.12
+- **Failure probability score** → `/predict`
+- **SHAP-based feature-level explanation** → `/explain` *(why is this machine at risk?)*
 
-## 3) Quick Start
+### Why SHAP Explainability?
+Knowing a machine has a 95% failure probability isn't enough for a maintenance engineer. FactoryGuard's `/explain` endpoint returns SHAP values that show *which sensor reading* is driving the risk — enabling targeted, faster intervention.
 
-### 3.1 Clone Repository
+---
+
+## 🚀 Production Features
+
+| Feature | Detail |
+|---|---|
+| 🔐 API Key Auth | Header or Bearer token protection on inference routes |
+| 🚦 Rate Limiting | Configurable per-endpoint limits (Redis-ready for distributed deployments) |
+| 🌐 CORS | Configurable allowlist |
+| 📊 Prometheus Metrics | `/metrics` endpoint for scraping |
+| 🩺 Health Probes | Liveness + Readiness probes for Kubernetes |
+| 📄 OpenAPI / Swagger | Auto-generated API docs at `/docs` and `/swagger` |
+| 🔍 SHAP Explainability | Feature-level failure driver breakdown |
+| 🧪 Automated Tests | 9 pytest cases covering all critical paths |
+| ⚙️ CI/CD | GitHub Actions for Python 3.10 & 3.12 |
+| 🐳 Docker | Container-ready with Dockerfile |
+| 📝 Structured Logging | Request IDs and structured log output |
+
+---
+
+## ⚡ Performance Benchmarks
+
+Benchmarked locally using `src/latency_benchmark.py` under single-user conditions:
+
+### `/predict` endpoint — 50 requests, no concurrency
+
+| Metric | Result |
+|---|---|
+| Success Rate | 50/50 (0% error) |
+| Average Latency | **18.88 ms** |
+| p50 Latency | 16.74 ms |
+| p95 Latency | 32.27 ms |
+| p99 Latency | 32.97 ms |
+| Max Latency | 33.25 ms |
+
+### `/explain` endpoint — 20 requests, no concurrency
+
+| Metric | Result |
+|---|---|
+| Average Latency | **20.25 ms** |
+| p95 Latency | 34.32 ms |
+| Error Rate | 0% |
+
+✅ Both endpoints comfortably meet the <50ms real-time inference requirement.
+
+---
+
+## 🗂 Project Structure
+
+```
+factoryguard-ai/
+├── api/                  # Flask app, route handlers, schemas, OpenAPI spec, docs UI
+├── src/                  # Model training, evaluation, feature engineering, benchmark utils
+├── notebooks/            # EDA and model development notebooks
+├── docker/               # Dockerfile and container configs
+├── docs/                 # Design notes and API documentation
+├── .github/workflows/    # GitHub Actions CI pipeline
+├── test_api.py           # Full API test suite (9 tests)
+├── requirements.txt      # Python dependencies
+├── .env.example          # Environment variable template
+└── README.md
+```
+
+---
+
+## 🛠 Quick Start
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/sumedChalakh/factoryguard-ai.git
 cd factoryguard-ai
 ```
 
-### 3.2 Create Virtual Environment
+### 2. Set up a virtual environment
 
 ```bash
 # Option A: Conda
@@ -54,86 +111,55 @@ conda activate factoryguard
 
 # Option B: venv
 python -m venv venv
-# Windows
-venv\Scripts\activate
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # macOS/Linux
 ```
 
-### 3.3 Install Dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3.4 Configure Environment
+### 4. Configure environment
 
 ```bash
-copy .env.example .env
+cp .env.example .env
+# Edit .env with your API key and settings
 ```
 
-Update `.env` values for your machine/security.
-
-### 3.5 Run Tests
+### 5. Run tests
 
 ```bash
 pytest test_api.py -v
 ```
 
-### 3.6 Run API
+### 6. Start the API
 
 ```bash
 python -m api.app
 ```
 
-Default base URL: `http://localhost:5000`
+API will be live at: `http://localhost:5000`
+Swagger docs at: `http://localhost:5000/docs`
 
-## 4) Environment Configuration
+---
 
-Key environment variables (see `.env.example`):
+## 🔌 API Reference
 
-```bash
-FLASK_ENV=production
-FLASK_DEBUG=0
-LOG_LEVEL=INFO
+### Health Endpoints
 
-API_KEY=change-me
-API_KEY_HEADER=X-API-Key
+| Method | Route | Description |
+|---|---|---|
+| GET | `/` | Basic service status |
+| GET | `/health/live` | Liveness probe |
+| GET | `/health/ready` | Readiness probe (checks model/scaler) |
 
-ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+### Inference Endpoints *(API key required)*
 
-DEFAULT_RATE_LIMIT=120 per minute
-PREDICT_RATE_LIMIT=60 per minute
-EXPLAIN_RATE_LIMIT=30 per minute
-RATE_LIMIT_STORAGE_URI=memory://
+#### `POST /predict` — Failure Risk Score
 
-MODEL_PATH=models/model.joblib
-SCALER_PATH=models/preprocessor.joblib
-
-HOST=0.0.0.0
-PORT=5000
-```
-
-### Notes
-- If `API_KEY` is set, `/predict` and `/explain` require it.
-- For distributed/real production, set `RATE_LIMIT_STORAGE_URI` to Redis.
-
-## 5) API Contract
-
-### 5.1 Health
-
-#### `GET /`
-Basic service status.
-
-#### `GET /health/live`
-Liveness probe.
-
-#### `GET /health/ready`
-Readiness probe (model/scaler readiness).
-
-### 5.2 Prediction
-
-#### `POST /predict`
-
-Request:
+**Request:**
 ```json
 {
   "temperature": 60,
@@ -142,16 +168,18 @@ Request:
 }
 ```
 
-Response:
+**Response:**
 ```json
 {
   "failure_probability": 0.95
 }
 ```
 
-#### `POST /explain`
+---
 
-Request:
+#### `POST /explain` — Failure Risk + SHAP Explanation
+
+**Request:**
 ```json
 {
   "temperature": 60,
@@ -160,137 +188,163 @@ Request:
 }
 ```
 
-Response shape:
+**Response:**
 ```json
 {
   "failure_probability": 0.95,
   "base_value": 0.5,
   "shap_values": {
-    "temperature": 0.0,
-    "vibration": 0.0,
-    "pressure": 0.0
+    "temperature": 0.12,
+    "vibration": 0.38,
+    "pressure": 0.05
   }
 }
 ```
+> In this example, `vibration` is the dominant driver of failure risk.
 
-### 5.3 Docs & Metrics
+---
 
-- `GET /openapi.json`
-- `GET /docs`
-- `GET /swagger`
-- `GET /metrics`
+### Observability & Docs
 
-## 6) Authentication
+| Method | Route | Description |
+|---|---|---|
+| GET | `/openapi.json` | Raw OpenAPI spec |
+| GET | `/docs` | Swagger UI |
+| GET | `/swagger` | Alternate Swagger UI |
+| GET | `/metrics` | Prometheus metrics |
 
-When `API_KEY` is configured, pass it as either:
-- header: `X-API-Key: <your-key>`
-- or bearer token: `Authorization: Bearer <your-key>`
+---
 
-Protected routes:
-- `/predict`
-- `/explain`
+## 🔐 Authentication
 
-## 7) Testing
+When `API_KEY` is set in `.env`, protected routes require it via:
 
-Run all tests:
+```bash
+# Header
+curl -H "X-API-Key: your-key" http://localhost:5000/predict ...
+
+# Bearer token
+curl -H "Authorization: Bearer your-key" http://localhost:5000/predict ...
+```
+
+Protected routes: `/predict`, `/explain`
+
+---
+
+## ⚙️ Environment Configuration
+
+See `.env.example` for all options. Key variables:
+
+```env
+# App
+FLASK_ENV=production
+FLASK_DEBUG=0
+LOG_LEVEL=INFO
+
+# Security
+API_KEY=change-me
+API_KEY_HEADER=X-API-Key
+ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+
+# Rate Limiting
+DEFAULT_RATE_LIMIT=120 per minute
+PREDICT_RATE_LIMIT=60 per minute
+EXPLAIN_RATE_LIMIT=30 per minute
+RATE_LIMIT_STORAGE_URI=memory://   # Use redis:// for distributed deployments
+
+# Models
+MODEL_PATH=models/model.joblib
+SCALER_PATH=models/preprocessor.joblib
+
+# Server
+HOST=0.0.0.0
+PORT=5000
+```
+
+---
+
+## 🐳 Docker Deployment
+
+```bash
+# Build
+docker build -f docker/Dockerfile -t factoryguard:latest .
+
+# Run
+docker run -p 5000:5000 --env-file .env factoryguard:latest
+```
+
+---
+
+## ☸️ Kubernetes Readiness
+
+FactoryGuard is probe-ready out of the box:
+
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 5000
+
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 5000
+```
+
+**Recommended production infra:**
+- TLS termination at ingress/reverse proxy
+- Redis-backed rate limiter (`RATE_LIMIT_STORAGE_URI=redis://...`)
+- Centralized logging (ELK / CloudWatch)
+- Metrics scraping + alerting (Prometheus + Grafana)
+
+---
+
+## 🧪 Testing
 
 ```bash
 pytest test_api.py -v
 ```
 
-Current suite: **9 tests**, covering:
-- health/live/ready endpoints
-- prediction and explanation success paths
-- schema validation errors
-- API key enforcement behavior
-- docs + metrics endpoints
+**Test coverage (9 tests):**
+- ✅ Health / liveness / readiness endpoints
+- ✅ Prediction success path
+- ✅ Explanation success path
+- ✅ Schema validation errors (bad input)
+- ✅ API key enforcement
+- ✅ Docs and metrics endpoints
 
-## 8) CI/CD
+---
 
-Workflow: `.github/workflows/test.yml`
+## 🔁 CI/CD
 
-Runs on push/PR (`main`, `develop`) and validates:
-- dependency installation
-- pytest execution
-- schema JSON loading
+GitHub Actions workflow: `.github/workflows/test.yml`
 
-Historical failed runs may still appear in Actions history; latest run status is the source of truth.
+Triggers on push/PR to `main` and `develop`. Validates:
+- Dependency installation
+- pytest execution (Python 3.10 & 3.12)
+- Schema JSON loading
 
-## 9) Performance Evidence (Latency)
+---
 
-The internship review requires a real-time API returning failure probability in under 50ms.
+## 🗺 Roadmap
 
-### 9.1 Benchmark Method
+- [ ] Add training notebook with model evaluation metrics (Accuracy, F1, ROC-AUC)
+- [ ] Document dataset source and feature engineering steps
+- [ ] Add live demo deployment (Render / Railway)
+- [ ] Expand to 5+ sensor features
+- [ ] Add batch prediction endpoint `/predict/batch`
+- [ ] Integrate alerting webhook for high-risk predictions
 
-Benchmark script: `src/latency_benchmark.py`
+---
 
-Command used for real-time `/predict` validation:
+## 👤 Author
 
-```bash
-python src/latency_benchmark.py --url http://127.0.0.1:5000/predict --requests 50 --concurrency 1 --warmup 5
-```
+**Sumed Chalakh**
+Aspiring Data Scientist | Nagpur, Maharashtra
 
-### 9.2 Measured Results (`/predict`)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue)](https://linkedin.com/in/sumed-chalakh-888986526/)
+[![GitHub](https://img.shields.io/badge/GitHub-Follow-black)](https://github.com/sumedChalakh)
 
-- Success rate: 50/50 (0% error)
-- Average latency: 18.88 ms
-- p50 latency: 16.74 ms
-- p95 latency: 32.27 ms
-- p99 latency: 32.97 ms
-- Max latency: 33.25 ms
+---
 
-✅ Requirement met: failure probability endpoint is under 50ms in real-time single-user conditions.
-
-### 9.3 Supporting Results (`/explain`)
-
-Command:
-
-```bash
-python src/latency_benchmark.py --url http://127.0.0.1:5000/explain --requests 20 --concurrency 1 --warmup 3
-```
-
-Observed:
-- Average latency: 20.25 ms
-- p95 latency: 34.32 ms
-- Error rate: 0%
-
-## 10) Deployment
-
-### 9.1 Docker
-
-```bash
-docker build -f docker/Dockerfile -t factoryguard:latest .
-docker run -p 5000:5000 --env-file .env factoryguard:latest
-```
-
-### 9.2 Kubernetes Probes
-
-- Liveness path: `/health/live`
-- Readiness path: `/health/ready`
-
-### 9.3 Recommended Infra Controls
-
-- TLS termination at ingress/reverse proxy
-- Redis-backed limiter storage
-- centralized logging (ELK/CloudWatch)
-- metrics scraping + alerting (Prometheus/Grafana)
-
-## 11) Project Structure
-
-```text
-api/                 Flask app, schemas, OpenAPI, docs UI
-src/                 Training, evaluation, feature engineering, utilities
-docker/              Docker files
-docs/                Design and API notes
-.github/workflows/   CI pipeline
-test_api.py          API test suite
-requirements.txt     Dependencies
-```
-
-## 12) Internship Handoff Notes
-
-- Project is complete for internship demonstration/deployment scope.
-- API is secured, observable, and CI-validated.
-- Documentation is finalized in this README and OpenAPI docs.
-
-Last updated: February 27, 2026
+*Last updated: February 27, 2026 | Internship handoff ready · Deployment ready · CI validated*
