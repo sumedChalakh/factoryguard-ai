@@ -6,7 +6,7 @@
 [![CI](https://github.com/sumedChalakh/factoryguard-ai/actions/workflows/test.yml/badge.svg)](https://github.com/sumedChalakh/factoryguard-ai/actions)
 ![Python](https://img.shields.io/badge/python-3.10%20|%203.12-blue)
 ![Flask](https://img.shields.io/badge/framework-Flask-lightgrey)
-![License](https://img.shields.io/badge/license-MIT-green)
+
 
 ---
 
@@ -334,16 +334,6 @@ Triggers on push/PR to `main` and `develop`. Validates:
 - [ ] Expand to 5+ sensor features
 - [ ] Add batch prediction endpoint `/predict/batch`
 - [ ] Integrate alerting webhook for high-risk predictions
-
----
-
-## 👤 Author
-
-**Sumed Chalakh**
-Aspiring Data Scientist | Nagpur, Maharashtra
-
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue)](https://linkedin.com/in/sumed-chalakh-888986526/)
-[![GitHub](https://img.shields.io/badge/GitHub-Follow-black)](https://github.com/sumedChalakh)
 
 ---
 
