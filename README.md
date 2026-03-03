@@ -142,6 +142,7 @@ pytest -v
 ### 6. Start the API
 
 ```bash
+cd factoryguard-ai
 python -m api.app
 ```
 
