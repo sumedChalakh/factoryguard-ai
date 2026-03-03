@@ -133,6 +133,11 @@ cp .env.example .env
 ```bash
 pytest test_api.py -v
 ```
+### Or
+
+```bash
+pytest -v
+```
 
 ### 6. Start the API
 
