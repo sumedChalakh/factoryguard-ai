@@ -146,6 +146,12 @@ cd factoryguard-ai
 python -m api.app
 ```
 
+Or
+
+```bash
+python -m api.app
+```
+
 API will be live at: `http://localhost:5000`
 Swagger docs at: `http://localhost:5000/docs`
 
